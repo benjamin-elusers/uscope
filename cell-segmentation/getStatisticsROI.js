@@ -22,6 +22,7 @@ importClass(Packages.ij.measure.Measurements);
 importClass(Packages.ij.measure.ResultsTable);
 importClass(Packages.ij.plugin.Duplicator);
 importClass(Packages.ij.plugin.FolderOpener);
+importClass(Packages.ij.plugin.filter.Analyzer);
 importClass(Packages.ij.plugin.filter.ParticleAnalyzer);
 importClass(Packages.ij.plugin.frame.PlugInDialog);
 importClass(Packages.ij.plugin.frame.RoiManager);
@@ -49,18 +50,23 @@ RM = new RoiManager(true);// initiating the ROI manager in hidden mode.
 MACRO = new Interpreter(); 
 AT = new AutoThresholder();
 //TA = new ThresholdAdjuster();
-PA = new ParticleAnalyzer()
+AN = new Analyzer();
+PA = new ParticleAnalyzer();
+
 PREF = new Prefs();
 WM = new WildcardMatch();
 OF = new Opener();
 OD = new FolderOpener();
 RT = new ResultsTable();
+IS = new ImageStatistics();
 RT.setNaNEmptyCells(true); 
 
 if (RM==null){ IJ.error("ROI Manager is not found"); }
 MACRO.batchMode = false; // activate batchmode (= setBatchMode(true) in IJ macro)
 PREF.blackBackground = true;
-file_sep	= "/"; // change to "\" if using windows I guess
+FS = PREF.separator;
+IJ.log("File separator:"+FS);
+
 
 //------CUSTOM FUNCTIONS-----//
 function getImages(Filelist){
@@ -223,7 +229,7 @@ function ThresholdROI(px2d,thr){
 		}
 	}
 
-	IJ.log("Remanining pixels: "+pxthr.L+" ("+nThr+" pixels  below "+thr+")");
+	//IJ.log("Remanining pixels: "+pxthr.L+" ("+nThr+" pixels  below "+thr+")");
 	return pxthr;
 }
 
@@ -304,6 +310,7 @@ function addZero(i) {
   return i;
 }
 
+
 ROOT="/media/elusers/users/benjamin/A-PROJECTS/01_PhD/04-image-analysis/HSG-mayor/Aug2019-Colocalization-SD/yeastspotter_output/"
 //------USER INPUT-----//
 OUTPUT = new File(ROOT+"OUT_CSV/");
@@ -362,6 +369,9 @@ function getFluorescent(file,path,C){
 	return(IMG);
 }
 
+
+
+
 // Processing directory of images
 IJ.log("");
 IJ.log("3. Get ROI with associated statistics for each image");
@@ -378,43 +388,50 @@ for(var S=FROM; S < TO; S++){
 	var OV = getSegmentation(SEG[S],IMGDIR.getCanonicalPath());
 	if( OV == null ) { continue ; }
 	var FL = getFluorescent(FL1[S],IMGDIR.getCanonicalPath(),1);
+
+	var measurements = Analyzer.getMeasurements();
+	RM.setOverlay(OV);
+	var table = RM.measure();
 	
 	IJ.log("    Save cell statistics to CSV file: '" + FL1[S] +".csv'");
 	for( var o=0; o<OV.size(); o++ ){
 		var CELL = OV.get(o);
 		FL.setRoi(CELL,true);
 		FL.getProcessor().setRoi(CELL);
-        var stats = FL.getProcessor().getStatistics(); 
+        //var stats = FL.getProcessor().getStatistics(); 
         
+		//var MED = ImageStatistics.getStatistics(FL.getProcessor(), Measurements.MEDIAN, FL.getCalibration());
+		//var roistats = FL.getStatistics(Measurements.ALL_STATS);
+		//print(roistats.circularity);
         
         var px2D = getpxROI(FL,CELL);
         var thr = getPercentile(threshold,px2D.I);
         var bins = getDeciles(px2D.I,0);
 		var thresholded = ThresholdROI(px2D, thr);
 		
-
-		RT.setValue( 'cell', o,  o+1 );
-        for( var k=0; k<cols.length; k++){
+		//RT.setValue( 'cell', o,  o+1 );
+        //for( var k=0; k<cols.length; k++){
         	//IJ.log(k + ". " + cols[k] + " : " + Measures[ cols[k] ] + " value : "+Math.round(stats[ Measures[ cols[k] ] ]) ); 
-       		RT.setValue( cols[k], o,  stats[Measures[ cols[k] ]] );
-       	}
+       	//	RT.setValue( cols[k], o,  stats[Measures[ cols[k] ]] );
+       	//}
 
-		RT.setValue( "npix.q"+threshold, o,  thresholded.L );
-		RT.setValue( "mean.q"+threshold, o,  arr.mean(thresholded.I) );
-		RT.setValue( "median.q"+threshold, o,  arr.median(thresholded.I) );
-		RT.setValue( "sd.q"+threshold, o,   arr.sd(thresholded.I) );
-		RT.setValue( "min.q"+threshold, o,  arr.min(thresholded.I) );
-		RT.setValue( "max.q"+threshold, o,  arr.max(thresholded.I) );
+		table.setValue( "npix.q"+threshold, o,  thresholded.L );
+		table.setValue( "mean.q"+threshold, o,  arr.mean(thresholded.I) );
+		table.setValue( "median.q"+threshold, o,  arr.median(thresholded.I) );
+		table.setValue( "sd.q"+threshold, o,   arr.sd(thresholded.I) );
+		table.setValue( "min.q"+threshold, o,  arr.min(thresholded.I) );
+		table.setValue( "max.q"+threshold, o,  arr.max(thresholded.I) );
 
 		for( var b=0; b < bins.length; b++){
 			//IJ.log("bins "+b+": "+bins[b]); 
-			if( bins[b] !== undefined ){ RT.setValue(C1+"_int_b"+b,o,bins[b]);  }
+			if( bins[b] !== undefined ){ table.setValue(C1+"_int_b"+b,o,bins[b]);  }
 		}
     }
 	
 	CSVFILE = OUTPUT.getCanonicalPath() + "/" + FL1[S] + ".csv";
 	//IJ.log(CSVFILE);
-	RT.saveAs(CSVFILE);
+	table.save(CSVFILE);
+	//RT.saveAs(CSVFILE);
 	RT.reset();
 	var t1=new Date().getTime();
 	var dt = t1-t0;
