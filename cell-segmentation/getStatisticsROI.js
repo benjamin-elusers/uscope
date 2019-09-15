@@ -52,7 +52,6 @@ AT = new AutoThresholder();
 //TA = new ThresholdAdjuster();
 AN = new Analyzer();
 PA = new ParticleAnalyzer();
-
 PREF = new Prefs();
 WM = new WildcardMatch();
 OF = new Opener();
@@ -64,9 +63,8 @@ RT.setNaNEmptyCells(true);
 if (RM==null){ IJ.error("ROI Manager is not found"); }
 MACRO.batchMode = false; // activate batchmode (= setBatchMode(true) in IJ macro)
 PREF.blackBackground = true;
-FS = PREF.separator;
-IJ.log("File separator:"+FS);
-
+FS = File.separator; // Could be changed to '\\' for windows (I guess)
+IJ.log("Default file separator:"+FS);
 
 //------CUSTOM FUNCTIONS-----//
 function getImages(Filelist){
@@ -354,7 +352,7 @@ IJ.log("");
 
 
 function getSegmentation(file,path){
-	var F = new File (path+"/"+file);
+	var F = new File (path+FS+file);
 	//IJ.log("seg="+F.getName());
 	var IMG = IJ.openImage(F);
 	var IP = IMG.getProcessor();
@@ -363,13 +361,11 @@ function getSegmentation(file,path){
 }
 
 function getFluorescent(file,path,C){
-	var F = new File (path+"/"+file);
+	var F = new File (path+FS+file);
 	//IJ.log("C"+C+"="+F.getName());
 	var IMG = IJ.openImage(F);
 	return(IMG);
 }
-
-
 
 
 // Processing directory of images
@@ -391,7 +387,7 @@ for(var S=FROM; S < TO; S++){
 
 	var measurements = Analyzer.getMeasurements();
 	RM.setOverlay(OV);
-	var table = RM.measure();
+	var table = RM.multiMeasure(FL); //RM.measure();
 	
 	IJ.log("    Save cell statistics to CSV file: '" + FL1[S] +".csv'");
 	for( var o=0; o<OV.size(); o++ ){
@@ -403,7 +399,6 @@ for(var S=FROM; S < TO; S++){
 		//var MED = ImageStatistics.getStatistics(FL.getProcessor(), Measurements.MEDIAN, FL.getCalibration());
 		//var roistats = FL.getStatistics(Measurements.ALL_STATS);
 		//print(roistats.circularity);
-        
         var px2D = getpxROI(FL,CELL);
         var thr = getPercentile(threshold,px2D.I);
         var bins = getDeciles(px2D.I,0);
